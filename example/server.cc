@@ -64,6 +64,7 @@ std::string log(const Request &req, const Response &res) {
   return s;
 }
 
+static std::string media_root = "D:\\testVideo\\";
 int main(void) {
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
   SSLServer svr(SERVER_CERT_FILE, SERVER_PRIVATE_KEY_FILE);
@@ -74,6 +75,26 @@ int main(void) {
   if (!svr.is_valid()) {
     printf("server has an error...\n");
     return -1;
+  }
+
+  svr.set_mount_point("/media", media_root);
+  for (std::string flv : {"264.flv", "1.flv"}) {
+    svr.Get("/" + flv, [flv](const Request& /*req*/, Response& res) {
+      FILE* fp = fopen((media_root + flv).c_str(), "rb");
+      if (!fp) {
+        res.status = 404;
+        res.reason = "file not found";
+        return;
+      }
+      res.set_content_provider("video/flv", [fp](size_t offset, DataSink& sink) {
+        char buff[4096];
+        int n = fread(buff, 1, sizeof(buff), fp);
+        sink.write(buff, n);
+        return n > 0;
+        }, [fp](bool success) {
+          fclose(fp);
+        });
+      });
   }
 
   svr.Get("/", [=](const Request & /*req*/, Response &res) {
@@ -107,7 +128,7 @@ int main(void) {
     printf("%s", log(req, res).c_str());
   });
 
-  svr.listen("localhost", 8080);
+  svr.listen("0.0.0.0", 8080);
 
   return 0;
 }
