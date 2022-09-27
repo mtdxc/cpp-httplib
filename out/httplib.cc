@@ -974,88 +974,68 @@ void get_remote_ip_and_port(socket_t sock, std::string &ip, int &port) {
     get_remote_ip_and_port(addr, addr_len, ip, port);
   }
 }
-
-constexpr unsigned int str2tag_core(const char *s, size_t l,
-                                           unsigned int h) {
-  return (l == 0) ? h
-                  : str2tag_core(s + 1, l - 1,
-                                 (h * 33) ^ static_cast<unsigned char>(*s));
-}
-
-unsigned int str2tag(const std::string &s) {
-  return str2tag_core(s.data(), s.size(), 0);
-}
-
-namespace udl {
-
-constexpr unsigned int operator"" _t(const char *s, size_t l) {
-  return str2tag_core(s, l, 0);
-}
-
-} // namespace udl
-
 const char *
 find_content_type(const std::string &path,
-                  const std::map<std::string, std::string> &user_data) {
+const std::map<std::string, std::string> &user_data) {
   auto ext = file_extension(path);
 
   auto it = user_data.find(ext);
   if (it != user_data.end()) { return it->second.c_str(); }
+  static std::map<std::string, std::string> internal_data = {
+    { "css", "text/css" },
+    { "csv", "text/csv" },
+    { "htm", "text/html" },
+    { "html", "text/html" },
+    { "js", "text/javascript" },
+    { "mjs", "text/javascript" },
+    { "txt", "text/plain" },
+    { "vtt", "text/vtt" },
 
-  using udl::operator""_t;
+    { "apng", "image/apng" },
+    { "avif", "image/avif" },
+    { "bmp", "image/bmp" },
+    { "gif", "image/gif" },
+    { "png", "image/png" },
+    { "svg", "image/svg+xml" },
+    { "webp", "image/webp" },
+    { "ico", "image/x-icon" },
+    { "tif", "image/tiff" },
+    { "tiff", "image/tiff" },
+    { "jpg", "image/jpeg" },
+    { "jpeg", "image/jpeg" },
 
-  switch (str2tag(ext)) {
-  default: return nullptr;
-  case "css"_t: return "text/css";
-  case "csv"_t: return "text/csv";
-  case "htm"_t:
-  case "html"_t: return "text/html";
-  case "js"_t:
-  case "mjs"_t: return "text/javascript";
-  case "txt"_t: return "text/plain";
-  case "vtt"_t: return "text/vtt";
+    { "mp4", "video/mp4" },
+    { "flv", "video/flv" },
+    { "mpeg", "video/mpeg" },
+    { "webm", "video/webm" },
 
-  case "apng"_t: return "image/apng";
-  case "avif"_t: return "image/avif";
-  case "bmp"_t: return "image/bmp";
-  case "gif"_t: return "image/gif";
-  case "png"_t: return "image/png";
-  case "svg"_t: return "image/svg+xml";
-  case "webp"_t: return "image/webp";
-  case "ico"_t: return "image/x-icon";
-  case "tif"_t: return "image/tiff";
-  case "tiff"_t: return "image/tiff";
-  case "jpg"_t:
-  case "jpeg"_t: return "image/jpeg";
+    { "mp3", "audio/mp3" },
+    { "mpga", "audio/mpeg" },
+    { "weba", "audio/webm" },
+    { "wav", "audio/wave" },
 
-  case "mp4"_t: return "video/mp4";
-  case "mpeg"_t: return "video/mpeg";
-  case "webm"_t: return "video/webm";
+    { "otf", "font/otf" },
+    { "ttf", "font/ttf" },
+    { "woff", "font/woff" },
+    { "woff2", "font/woff2" },
 
-  case "mp3"_t: return "audio/mp3";
-  case "mpga"_t: return "audio/mpeg";
-  case "weba"_t: return "audio/webm";
-  case "wav"_t: return "audio/wave";
-
-  case "otf"_t: return "font/otf";
-  case "ttf"_t: return "font/ttf";
-  case "woff"_t: return "font/woff";
-  case "woff2"_t: return "font/woff2";
-
-  case "7z"_t: return "application/x-7z-compressed";
-  case "atom"_t: return "application/atom+xml";
-  case "pdf"_t: return "application/pdf";
-  case "json"_t: return "application/json";
-  case "rss"_t: return "application/rss+xml";
-  case "tar"_t: return "application/x-tar";
-  case "xht"_t:
-  case "xhtml"_t: return "application/xhtml+xml";
-  case "xslt"_t: return "application/xslt+xml";
-  case "xml"_t: return "application/xml";
-  case "gz"_t: return "application/gzip";
-  case "zip"_t: return "application/zip";
-  case "wasm"_t: return "application/wasm";
-  }
+    { "7z", "application/x-7z-compressed" },
+    { "atom", "application/atom+xml" },
+    { "pdf", "application/pdf" },
+    { "json", "application/json" },
+    { "rss", "application/rss+xml" },
+    { "tar", "application/x-tar" },
+    { "xht", "application/xhtml+xml" },
+    { "xhtml", "application/xhtml+xml" },
+    { "xslt", "application/xslt+xml" },
+    { "xml", "application/xml" },
+    { "gz", "application/gzip" },
+    { "zip", "application/zip" },
+    { "wasm", "application/wasm" }
+  };
+  it = internal_data.find(ext);
+  if (it != internal_data.end()) { return it->second.c_str(); }
+  return nullptr;
 }
 
 const char *status_message(int status) {
@@ -1129,21 +1109,18 @@ const char *status_message(int status) {
 }
 
 bool can_compress_content_type(const std::string &content_type) {
-  using udl::operator""_t;
-
-  auto tag = str2tag(content_type);
-
-  switch (tag) {
-  case "image/svg+xml"_t:
-  case "application/javascript"_t:
-  case "application/json"_t:
-  case "application/xml"_t:
-  case "application/protobuf"_t:
-  case "application/xhtml+xml"_t: return true;
-
-  default:
-    return !content_type.rfind("text/", 0) && tag != "text/event-stream"_t;
+  static std::set<std::string> compress_set = { 
+    "image/svg+xml", 
+    "application/javascript", 
+    "application/json", 
+    "application/xml", 
+    "application/protobuf", 
+    "application/xhtml+xml" 
+  };
+  if (!compress_set.count(content_type)) {
+    return !content_type.rfind("text/", 0) && content_type != "text/event-stream";
   }
+  return true;
 }
 
 EncodingType encoding_type(const Request &req, const Response &res) {
@@ -2921,9 +2898,7 @@ const std::string &BufferStream::get_buffer() const { return buffer; }
 
 // HTTP server implementation
 Server::Server()
-    : new_task_queue(
-          [] { return new ThreadPool(CPPHTTPLIB_THREAD_POOL_COUNT); }),
-      svr_sock_(INVALID_SOCKET), is_running_(false) {
+    : svr_sock_(INVALID_SOCKET), is_running_(false) {
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);
 #endif
@@ -3537,7 +3512,8 @@ bool Server::listen_internal() {
   is_running_ = true;
 
   {
-    std::unique_ptr<TaskQueue> task_queue(new_task_queue());
+    if (!task_queue_)
+      task_queue_ = std::make_shared<ThreadPool>(CPPHTTPLIB_THREAD_POOL_COUNT);
 
     while (svr_sock_ != INVALID_SOCKET) {
 #ifndef _WIN32
@@ -3546,7 +3522,7 @@ bool Server::listen_internal() {
         auto val = detail::select_read(svr_sock_, idle_interval_sec_,
                                        idle_interval_usec_);
         if (val == 0) { // Timeout
-          task_queue->on_idle();
+          task_queue_->on_idle();
           continue;
         }
 #ifndef _WIN32
@@ -3599,13 +3575,12 @@ bool Server::listen_internal() {
       }
 
 #if __cplusplus > 201703L
-      task_queue->enqueue([=, this]() { process_and_close_socket(sock); });
+      task_queue_->enqueue([=, this]() { process_and_close_socket(sock); });
 #else
-      task_queue->enqueue([=]() { process_and_close_socket(sock); });
+      task_queue_->enqueue([=]() { process_and_close_socket(sock); });
 #endif
     }
-
-    task_queue->shutdown();
+    // task_queue_->shutdown();
   }
 
   is_running_ = false;
@@ -4229,7 +4204,7 @@ Result ClientImpl::send(const Request &req) {
 }
 
 Result ClientImpl::send_(Request &&req) {
-  auto res = detail::make_unique<Response>();
+  auto res = std::make_shared<Response>();
   auto error = Error::Success;
   auto ret = send(req, *res, error);
   return Result{ret ? std::move(res) : nullptr, error, std::move(req.headers)};
@@ -4493,7 +4468,7 @@ bool ClientImpl::write_request(Stream &strm, Request &req,
   return true;
 }
 
-std::unique_ptr<Response> ClientImpl::send_with_content_provider(
+std::shared_ptr<Response> ClientImpl::send_with_content_provider(
     Request &req, const char *body, size_t content_length,
     ContentProvider content_provider,
     ContentProviderWithoutLength content_provider_without_length,
@@ -4573,7 +4548,7 @@ std::unique_ptr<Response> ClientImpl::send_with_content_provider(
     }
   }
 
-  auto res = detail::make_unique<Response>();
+  auto res = std::make_shared<Response>();
   return send(req, *res, error) ? std::move(res) : nullptr;
 }
 

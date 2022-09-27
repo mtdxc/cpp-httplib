@@ -128,7 +128,8 @@
 
 #if defined(_MSC_VER)
 #if _MSC_VER < 1900
-#error Sorry, Visual Studio versions prior to 2015 are not supported
+//#error Sorry, Visual Studio versions prior to 2015 are not supported
+#define snprintf sprintf_s
 #endif
 
 #pragma comment(lib, "ws2_32.lib")
@@ -172,7 +173,9 @@ using socket_t = SOCKET;
 #else // not _WIN32
 
 #include <arpa/inet.h>
+#if !defined ANDROID
 #include <ifaddrs.h>
+#endif
 #include <net/if.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -490,8 +493,8 @@ struct Response {
   Response() = default;
   Response(const Response &) = default;
   Response &operator=(const Response &) = default;
-  Response(Response &&) = default;
-  Response &operator=(Response &&) = default;
+  //Response(Response &&) = default;
+  //Response &operator=(Response &&) = default;
   ~Response() {
     if (content_provider_resource_releaser_) {
       content_provider_resource_releaser_(content_provider_success_);
@@ -545,7 +548,9 @@ public:
   }
 
   ThreadPool(const ThreadPool &) = delete;
-  ~ThreadPool() override = default;
+  ~ThreadPool() override {
+    shutdown();
+  }
 
   void enqueue(std::function<void()> fn) override {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -566,6 +571,7 @@ public:
     for (auto &t : threads_) {
       t.join();
     }
+    threads_.clear();
   }
 
 private:
@@ -698,9 +704,11 @@ public:
   bool is_running() const;
   void stop();
 
-  std::function<TaskQueue *(void)> new_task_queue;
-
+  // std::function<TaskQueue *(void)> new_task_queue;
+  void setTaskQueue(std::shared_ptr<TaskQueue> queue){ task_queue_ = queue; }
+  TaskQueue* getTaskQueue(){ return task_queue_.get(); }
 protected:
+  std::shared_ptr<TaskQueue> task_queue_;
   bool process_request(Stream &strm, bool close_connection,
                        bool &connection_closed,
                        const std::function<void(Request &)> &setup_request);
@@ -819,9 +827,9 @@ std::ostream &operator<<(std::ostream &os, const Error &obj);
 
 class Result {
 public:
-  Result(std::unique_ptr<Response> &&res, Error err,
+  Result(std::shared_ptr<Response> res, Error err,
          Headers &&request_headers = Headers{})
-      : res_(std::move(res)), err_(err),
+      : res_(res), err_(err),
         request_headers_(std::move(request_headers)) {}
   // Response
   operator bool() const { return res_ != nullptr; }
@@ -846,7 +854,7 @@ public:
   size_t get_request_header_value_count(const std::string &key) const;
 
 private:
-  std::unique_ptr<Response> res_;
+  std::shared_ptr<Response> res_;
   Error err_;
   Headers request_headers_;
 };
@@ -1185,7 +1193,7 @@ private:
   bool redirect(Request &req, Response &res, Error &error);
   bool handle_request(Stream &strm, Request &req, Response &res,
                       bool close_connection, Error &error);
-  std::unique_ptr<Response> send_with_content_provider(
+  std::shared_ptr<Response> send_with_content_provider(
       Request &req, const char *body, size_t content_length,
       ContentProvider content_provider,
       ContentProviderWithoutLength content_provider_without_length,
@@ -1220,7 +1228,7 @@ public:
                   const std::string &client_cert_path,
                   const std::string &client_key_path);
 
-  Client(Client &&) = default;
+  //Client(Client &&) = default;
 
   ~Client();
 
@@ -1895,7 +1903,9 @@ private:
   size_t fixed_buffer_used_size_ = 0;
   std::string glowable_buffer_;
 };
-
+const char *
+find_content_type(const std::string &path,
+const std::map<std::string, std::string> &user_data);
 } // namespace detail
 
 
